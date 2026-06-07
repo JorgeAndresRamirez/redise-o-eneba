@@ -16,11 +16,7 @@ Trabajo del **Máster en Diseño de Experiencia de Usuario (UX)** de la **UNIR �
 
 ## Demo en vivo
 
-Publica el repositorio en GitHub y activa GitHub Pages para obtener una URL como:
-
-**https://[tu-usuario].github.io/[nombre-del-repositorio]/**
-
-Sustituye los corchetes por tu usuario y el nombre del repo tras el primer despliegue.
+**https://jorgeandresramirez.github.io/redise-o-eneba/**
 
 ## Descripción del proyecto
 
@@ -84,7 +80,7 @@ git init
 git add README.md docs/ assets/
 git commit -m "Prototipo Eneba LATAM — arquitectura en red"
 git branch -M main
-git remote add origin https://github.com/[TU-USUARIO]/[TU-REPO].git
+git remote add origin https://github.com/JorgeAndresRamirez/redise-o-eneba.git
 git push -u origin main
 ```
 
@@ -109,6 +105,10 @@ REDISEÑO ENEBA/
 │   ├── index.html
 │   ├── styles.css
 │   ├── script.js
+│   ├── data.js
+│   ├── i18n.js
+│   ├── icons.js
+│   ├── assets/
 │   └── .nojekyll
 └── assets/               # Capturas del sitemap
 ```
