@@ -622,21 +622,41 @@ function renderCart() {
   }
 }
 
-function renderSearchPanel() {
-  const panel = document.getElementById('search-panel');
-  if (!state.searchFocused) { panel.classList.add('hidden'); return; }
+function buildSearchPanelHtml() {
   const q = state.searchQuery.toLowerCase();
   const results = SEARCH_INDEX_HI.filter((s) => !q || s.q.toLowerCase().includes(q) || s.label.toLowerCase().includes(q));
   const history = ['Cyberpunk 2077', 'Steam Wallet', 'Xbox Game Pass'];
-  panel.innerHTML = `
+  return `
     ${!q ? `<div class="search-panel-header">${t('search.recent')}</div>
       ${history.map((h) => { const it = SEARCH_INDEX_HI.find((s) => s.q === h); return it ? searchItem(it) : ''; }).join('')}` : ''}
     <div class="search-panel-header">${t('search.suggestions')}</div>
     ${results.map(searchItem).join('')}`;
+}
+
+function renderSearchPanel() {
+  const panel = document.getElementById('search-panel');
+  if (!panel) return;
+  if (!state.searchFocused) { panel.classList.add('hidden'); return; }
+  panel.innerHTML = buildSearchPanelHtml();
   panel.classList.remove('hidden');
   panel.querySelectorAll('[data-sroute]').forEach((el) => {
     el.onclick = () => { state.searchFocused = false; pushCrumb(el.dataset.label, el.dataset.sroute); };
   });
+}
+
+function bindSearchInput(input) {
+  if (!input) return;
+  input.placeholder = t('search.placeholder');
+  input.value = state.searchQuery;
+  input.onfocus = () => { state.searchFocused = true; renderSearchPanel(); };
+  input.onblur = () => setTimeout(() => { state.searchFocused = false; renderSearchPanel(); }, 200);
+  input.oninput = (e) => { state.searchQuery = e.target.value; renderSearchPanel(); };
+  input.onkeydown = (e) => {
+    if (e.key === 'Enter' && state.searchQuery.trim()) {
+      const match = SEARCH_INDEX_HI.find((s) => s.q.toLowerCase().includes(state.searchQuery.toLowerCase()));
+      if (match) pushCrumb(match.q, match.route);
+    }
+  };
 }
 
 function searchItem(s) {
@@ -933,6 +953,64 @@ function deviceLabel(d) {
   return t('detail.devices.' + d) || d;
 }
 
+function renderPdpContextMenus(p) {
+  if (p.kind !== 'game') return '';
+  const coins = getServices('monedas').map(enrichService).slice(0, 2);
+  const skinItems = getAllGames().filter((g) => g.id !== p.id).slice(0, 2);
+  const skinLabels = [t('detail.skinLegendary'), t('detail.skinSeason')];
+  const coinItems = coins.map((s) => `
+    <button type="button" class="pdp-context-item" data-route="product/${s.id}">
+      <span class="pdp-context-item__label">${esc(s.title)}</span>
+      <span class="price-current">${formatPrice(s.price)}</span>
+    </button>`).join('');
+  const skinRows = skinItems.map((g, i) => `
+    <button type="button" class="pdp-context-item" data-route="product/${g.id}">
+      <span class="pdp-context-item__label">
+        <strong>${esc(skinLabels[i] || t('detail.skinLegendary'))}</strong>
+        <small>${esc(g.title)}</small>
+      </span>
+      <span class="price-current">${formatPrice(g.price)}</span>
+    </button>`).join('');
+  return `<section class="pdp-context" aria-label="${t('detail.contextNav')}">
+    <div class="pdp-context__grid">
+      <article class="pdp-context-card">
+        <button type="button" class="pdp-context-card__head" data-route="recharges/monedas">
+          <span class="pdp-context-card__icon">${icon('gamepad')}</span>
+          <div class="pdp-context-card__text">
+            <p class="pdp-context-card__title">${t('detail.getCoins')}</p>
+            <p class="pdp-context-card__sub">${t('detail.getCoinsSub')}</p>
+          </div>
+          <span class="pdp-context-card__chevron">${icon('chevron')}</span>
+        </button>
+        <div class="pdp-context-card__items">
+          ${coinItems}
+          <button type="button" class="pdp-context-item pdp-context-item--more" data-route="recharges/monedas">
+            <span>${t('detail.viewAllCoins')}</span>
+            <span class="pdp-context-item__arrow">${icon('chevron')}</span>
+          </button>
+        </div>
+      </article>
+      <article class="pdp-context-card">
+        <button type="button" class="pdp-context-card__head" data-route="games/adiciones/skins">
+          <span class="pdp-context-card__icon">${icon('heart')}</span>
+          <div class="pdp-context-card__text">
+            <p class="pdp-context-card__title">${t('detail.buySkins')}</p>
+            <p class="pdp-context-card__sub">${t('detail.buySkinsSub')}</p>
+          </div>
+          <span class="pdp-context-card__chevron">${icon('chevron')}</span>
+        </button>
+        <div class="pdp-context-card__items">
+          ${skinRows}
+          <button type="button" class="pdp-context-item pdp-context-item--more" data-route="games/adiciones/skins">
+            <span>${t('detail.viewAllSkins')}</span>
+            <span class="pdp-context-item__arrow">${icon('chevron')}</span>
+          </button>
+        </div>
+      </article>
+    </div>
+  </section>`;
+}
+
 function renderProduct() {
   const id = state.route.split('/')[1];
   const p = getProduct(id);
@@ -1028,6 +1106,8 @@ function renderProduct() {
         </div>
       </div>
     </section>
+
+    ${renderPdpContextMenus(p)}
 
     <div class="pdp-content">
       ${p.showGiftNotice ? `<div class="pdp__notice">${icon('alert')}<p>${t('detail.giftNotice')}</p></div>` : ''}
@@ -1328,9 +1408,10 @@ function render() {
   const isPdp = state.route.startsWith('product/');
   const isHome = state.route === 'home';
   document.querySelector('.page-wrap')?.classList.toggle('page-wrap--pdp', isPdp);
-  document.querySelector('.page-wrap')?.classList.toggle('page-wrap--home', isHome && !isPdp);
+  const showHomeSearch = isHome && !isPdp;
+  document.querySelector('.page-wrap')?.classList.toggle('page-wrap--home', showHomeSearch);
   document.getElementById('main-content').classList.toggle('main-content--pdp', isPdp);
-  document.getElementById('main-content').classList.toggle('main-content--home', isHome && !isPdp);
+  document.getElementById('main-content').classList.toggle('main-content--home', showHomeSearch);
   document.getElementById('main-content').innerHTML = renderMain();
   bindMainEvents();
   renderCart();
@@ -1368,16 +1449,7 @@ function init() {
     document.getElementById('l1-nav').classList.toggle('open');
   };
 
-  const si = document.getElementById('search-input');
-  si.onfocus = () => { state.searchFocused = true; renderSearchPanel(); };
-  si.onblur = () => setTimeout(() => { state.searchFocused = false; renderSearchPanel(); }, 200);
-  si.oninput = (e) => { state.searchQuery = e.target.value; renderSearchPanel(); };
-  si.onkeydown = (e) => {
-    if (e.key === 'Enter' && state.searchQuery.trim()) {
-      const match = SEARCH_INDEX_HI.find((s) => s.q.toLowerCase().includes(state.searchQuery.toLowerCase()));
-      if (match) pushCrumb(match.q, match.route);
-    }
-  };
+  bindSearchInput(document.getElementById('search-input'));
 
   setInterval(() => {
     if (state.route !== 'home') return;
